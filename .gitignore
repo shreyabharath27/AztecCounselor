@@ -1,0 +1,18 @@
+# Private information
+.env
+.env.*
+!.env.example
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Python files
+__pycache__/
+*.py[cod]
+
+# IDE/macOS files
+.vscode/
+.idea/
+.DS_Store
