@@ -7,6 +7,9 @@ app = FastAPI()
 from app.routes.transcript import router as transcript_router 
 app.include_router(transcript_router)
 
+from app.routes.plans import router as plans_router
+app.include_router(plans_router)
+
 
 @app.get("/")
 def read_root():
