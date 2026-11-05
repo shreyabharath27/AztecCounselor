@@ -21,9 +21,10 @@ import io
 import json
 import boto3
 import pdfplumber
-import psycopg2
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from dotenv import load_dotenv
+
+from app.database import get_connection
 
 load_dotenv()
 
@@ -32,14 +33,6 @@ router = APIRouter()
 # --- AWS / DB config, pulled from .env ---
 S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME")
 AWS_REGION = os.getenv("AWS_REGION")
-
-DB_CONFIG = {
-    "host": os.getenv("DB_HOST"),
-    "dbname": os.getenv("DB_NAME"),
-    "user": os.getenv("DB_USER"),
-    "password": os.getenv("DB_PASSWORD"),
-    "port": os.getenv("DB_PORT", 5432),
-}
 
 s3_client = boto3.client("s3", region_name=AWS_REGION)
 
@@ -99,33 +92,69 @@ Transcript text:
         courses = json.loads(cleaned)
     except json.JSONDecodeError:
         print(f"Could not parse Bedrock output as JSON:\n{raw_output}")
-        return []
+        raise HTTPException(
+            status_code=502,
+            detail="Bedrock did not return valid course JSON. Existing completions were not changed.",
+        )
+
+    if not isinstance(courses, list):
+        raise HTTPException(
+            status_code=502,
+            detail="Bedrock returned an unexpected course format. Existing completions were not changed.",
+        )
 
     return courses
 
 
-def insert_completions(student_id: int, courses: list[dict]) -> int:
-    """Insert extracted completions into the completions table."""
-    conn = psycopg2.connect(**DB_CONFIG)
+def student_exists(student_id: int) -> bool:
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT 1 FROM students WHERE id = %s", (student_id,))
+        return cur.fetchone() is not None
+    finally:
+        cur.close()
+        conn.close()
+
+
+def replace_completions(student_id: int, courses: list[dict]) -> int:
+    """Replace this student's transcript-derived completions in one transaction."""
+    conn = get_connection()
     cur = conn.cursor()
 
-    for course in courses:
-        cur.execute(
-            """
-            INSERT INTO completions (student_id, course_code, grade, semester_taken)
-            VALUES (%s, %s, %s, %s)
-            """,
-            (student_id, course["course_code"], course.get("grade"), course.get("semester_taken")),
-        )
+    try:
+        cur.execute("DELETE FROM completions WHERE student_id = %s", (student_id,))
 
-    conn.commit()
-    cur.close()
-    conn.close()
-    return len(courses)
+        for course in courses:
+            course_code = course.get("course_code")
+            if not course_code:
+                raise HTTPException(
+                    status_code=502,
+                    detail="Bedrock returned a course without a course_code. Existing completions were not changed.",
+                )
+            cur.execute(
+                """
+                INSERT INTO completions (student_id, course_code, grade, semester_taken)
+                VALUES (%s, %s, %s, %s)
+                """,
+                (student_id, course_code, course.get("grade"), course.get("semester_taken")),
+            )
+
+        conn.commit()
+        return len(courses)
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        cur.close()
+        conn.close()
 
 
 @router.post("/students/{student_id}/upload-transcript")
 async def upload_transcript(student_id: int, file: UploadFile = File(...)):
+    if not student_exists(student_id):
+        raise HTTPException(status_code=404, detail="Student not found")
+
     if file.content_type != "application/pdf":
         raise HTTPException(status_code=400, detail="Only PDF files are supported.")
 
@@ -142,13 +171,13 @@ async def upload_transcript(student_id: int, file: UploadFile = File(...)):
     # Step 3: send to Bedrock (stubbed for now)
     extracted_courses = call_bedrock_extract_courses(transcript_text)
 
-    # Step 4: save to Postgres
-    num_inserted = insert_completions(student_id, extracted_courses)
+    # Step 4: replace this student's previous transcript data in Postgres
+    num_inserted = replace_completions(student_id, extracted_courses)
 
     # Step 5: respond
     return {
         "status": "success",
         "s3_key": s3_key,
-        "courses_added": num_inserted,
+        "courses_saved": num_inserted,
         "courses": extracted_courses,
     }
