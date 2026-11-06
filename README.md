@@ -58,6 +58,8 @@ Amazon Bedrock converts unstructured transcript text into structured course data
 
 The deterministic evaluator checks prerequisites, duplicate or previously completed courses, graduation-requirement coverage, and semester unit limits. This ensures that plan validation does not rely solely on the language model.
 
+<img width="1105" height="527" alt="Screenshot 2026-11-05 at 5 15 08 PM" src="https://github.com/user-attachments/assets/db16f239-91df-4730-b461-ae87de63e88b" /> 
+
 
 ## System Architecture
 
