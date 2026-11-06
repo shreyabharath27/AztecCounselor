@@ -2,6 +2,10 @@
 
 Aztec Counselor is a full-stack degree-planning application that transforms a student’s transcript and personal constraints into a semester-by-semester graduation plan. It combines Amazon Bedrock’s language-model reasoning with deterministic validation to account for completed courses, prerequisites, degree requirements, unit limits, and individual preferences.
 
+<img width="1105" height="527" alt="Screenshot 2026-11-05 at 5 15 08 PM" src="https://github.com/user-attachments/assets/db16f239-91df-4730-b461-ae87de63e88b" /> 
+
+<img width="1428" height="662" alt="Screenshot 2026-11-05 at 5 17 34 PM" src="https://github.com/user-attachments/assets/93e54a3e-0849-4309-af12-38850cd6b3b1" />
+
 ## Key Features
 
 - Creates and stores student profiles
@@ -58,7 +62,7 @@ Amazon Bedrock converts unstructured transcript text into structured course data
 
 The deterministic evaluator checks prerequisites, duplicate or previously completed courses, graduation-requirement coverage, and semester unit limits. This ensures that plan validation does not rely solely on the language model.
 
-<img width="1105" height="527" alt="Screenshot 2026-11-05 at 5 15 08 PM" src="https://github.com/user-attachments/assets/db16f239-91df-4730-b461-ae87de63e88b" /> 
+
 
 
 ## System Architecture
